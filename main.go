@@ -191,7 +191,7 @@ func extractLinks(htmlText string) ([]Link, error) {
 	check(err)
 
 	// Algorithm taken from https://pkg.go.dev/golang.org/x/net/html#pkg-functions
-	// Takes an html.Node and walks the tree recursivly
+	// Takes an html.Node and walks the tree recursively
 	var f func(*html.Node)
 	f = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "a" {
@@ -214,7 +214,7 @@ func extractLinks(htmlText string) ([]Link, error) {
 	}
 	f(node)
 	if links == nil {
-		return nil, errors.New("No links found.")
+		return nil, errors.New("no links found")
 	}
 	return links, nil
 }
@@ -279,6 +279,7 @@ func downloadFile(link Link, useLinkName bool, pathOptional ...string) error {
 func normalExit() {
 	fmt.Print("\nPress 'Enter' to continue...")
 	pause()
+	os.Exit(0)
 }
 
 func pause() {
