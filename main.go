@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"strings"
 	"unicode"
 
@@ -11,15 +13,30 @@ import (
 
 func main() {
 	pdf.DebugOn = true
-	invoice, err := readPdf("test.pdf") // Read local pdf file
-	if err != nil {
-		panic(err)
+	files := getPdfFiles()
+	for _, file := range files {
+		invoice, err := readPdf(file) // Read local pdf file
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(
+			getBillToName(invoice))
 	}
-	fmt.Println(invoice)
+}
 
-	billToName := getBillToName(invoice)
-
-	fmt.Println(billToName)
+func getPdfFiles() []string {
+	var pdfList []string
+	files, err := ioutil.ReadDir(".")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, file := range files {
+		name := file.Name()
+		if strings.Contains(name, ".pdf") {
+			pdfList = append(pdfList, name)
+		}
+	}
+	return pdfList
 }
 
 func readPdf(path string) (string, error) {
@@ -40,7 +57,6 @@ func readPdf(path string) (string, error) {
 
 func getBillToName(pdfStr string) string {
 	pdfStr = pdfStr[strings.Index(pdfStr, "BILL TO:")+8:]
-
 	for i, character := range pdfStr {
 		if unicode.IsDigit(character) {
 			return strings.Replace(pdfStr[:i], " ", "_", -1)
