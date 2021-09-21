@@ -11,6 +11,7 @@ import (
 	"github.com/ledongthuc/pdf"
 )
 
+// Test comment
 func main() {
 	pdf.DebugOn = true
 	files := getPdfFiles()
