@@ -50,42 +50,17 @@ func main() {
 
 	// Download links
 	fmt.Printf("%d file's to download...\n", len(links))
-	complete := downloadLinks(links)
+	complete := downloadLinks(links, len(links))
 	fmt.Printf("%d of %d files downloaded completely.\n\n", complete, len(links))
 
 	fmt.Println("Renaming files...")
-	renameFiles()
+	renameFiles(len(links))
+	fmt.Printf("%d of %d files renamed successfully.\n\n", complete, len(links))
 	normalExit()
 } // End main
 
-func getCwdFileList() []string {
-	var (
-		listing []string
-		fTypes  = []string{"htm", "html", "eml"}
-	)
-
-	list, err := os.ReadDir(".")
-	check(err)
-
-	for _, f := range list {
-		if filepath.Base(os.Args[0]) != f.Name() && !f.IsDir() && existsIn(fTypes, f.Name()) {
-			listing = append(listing, f.Name())
-		}
-	}
-	return listing
-}
-
-func existsIn(list []string, a string) bool {
-	for _, b := range list {
-		if strings.Contains(a, strings.ToLower(b)) {
-			return true
-		}
-	}
-	return false
-}
-
 func getFileName() string {
-	files := getCwdFileList()
+	files := getCwdEmailList()
 	var choice string
 	for {
 		fmt.Println("Please select the email to open.")
@@ -105,31 +80,75 @@ func getFileName() string {
 			os.Exit(0)
 		}
 		ans, err := strconv.ParseUint(input, 10, 16)
-		if err != nil || int(ans) >= len(files)+1 || int(ans) < 1 {
-			fmt.Println("\nInvalid entry, please try again.")
-			fmt.Println()
-			continue
-		} else {
+		// If valid entry
+		if err == nil && (int(ans) > 0 && int(ans) <= len(files)) {
 			fmt.Printf("\nYou selected: %v \n\n", ans)
 			choice = files[ans-1]
 			break
 		}
+		// else
+		fmt.Println("\nInvalid entry, please try again.")
+		fmt.Println()
 	}
 	return choice
 }
 
-func getRawFileDataAsStr(filename string) string {
-	var data string
+func getCwdEmailList() []string {
+	var (
+		listing []string
+		fTypes  = []string{"htm", "html", "eml"}
+	)
 
-	if strings.Contains(filename, "eml") {
-		data = getEMLContent(filename)
-	} else {
-		data = getHTMLContent(filename)
+	list, err := ioutil.ReadDir(".")
+	check(err)
+
+	for _, f := range list {
+		if existsIn(fTypes, f.Name()) {
+			listing = append(listing, f.Name())
+		}
 	}
-	return string(data)
+	return listing
+}
+
+func existsIn(list []string, a string) bool {
+	for _, b := range list {
+		if strings.HasSuffix(a, strings.ToLower(b)) {
+			return true
+		}
+	}
+	return false
+}
+
+func getRawFileDataAsStr(filename string) string {
+	if strings.Contains(filename, "eml") {
+		return string(getEMLContent(filename))
+	}
+	return string(getHTMLContent(filename))
 }
 
 func getEMLContent(filename string) string {
+	email := getEmailContent(filename)
+	html := email.HTMLBody
+	decoded, err := base64.StdEncoding.DecodeString(html)
+	if err != nil {
+		fmt.Println("Data not base64 encoded.")
+		fmt.Println()
+		return html
+	} // else {
+	fmt.Println("Data is base64 encoded.")
+	fmt.Println()
+	return string(decoded)
+	// }
+	// return retVal
+}
+
+func getHTMLContent(filename string) string {
+	temp, err := os.ReadFile(filename)
+	check(err)
+	return string(temp)
+}
+
+func getEmailContent(filename string) parsemail.Email {
 	rd := getBytesReaderFromFile(filename)
 
 	email, err := parsemail.Parse(rd)
@@ -143,25 +162,7 @@ func getEMLContent(filename string) string {
 		pause()
 		os.Exit(1)
 	}
-	html := email.HTMLBody
-	var retVal string
-	decoded, err := base64.StdEncoding.DecodeString(html)
-	if err != nil {
-		fmt.Println("Data not base64 encoded.")
-		fmt.Println()
-		retVal = html
-	} else {
-		fmt.Println("Data is base64 encoded.")
-		fmt.Println()
-		retVal = string(decoded)
-	}
-	return retVal
-}
-
-func getHTMLContent(filename string) string {
-	temp, err := os.ReadFile(filename)
-	check(err)
-	return string(temp)
+	return email
 }
 
 func convertToUTF8(data string) string {
@@ -225,10 +226,10 @@ func extractLinks(htmlText string) ([]Link, error) {
 	return links, nil
 }
 
-func downloadLinks(links []Link) int {
+func downloadLinks(links []Link, total int) int {
 	complete := 0
 	for _, link := range links {
-		fmt.Printf("Downloading %s...", link.text)
+		fmt.Printf("Downloading %s %d of %d...", link.text, (complete + 1), total)
 		err := downloadFile(link, true)
 		if err != nil {
 			fmt.Printf("\terror, incomplete!\n")
@@ -284,18 +285,18 @@ func downloadFile(link Link, useLinkName bool, pathOptional ...string) error {
 	return err
 }
 
-func renameFiles() {
+func renameFiles(total int) {
 	pdf.DebugOn = true
 
 	files := getPdfFiles()
-	for _, file := range files {
+	for i, file := range files {
 		invoice, err := readPdf(file) // Read local pdf file
 		if err != nil {
 			panic(err)
 		}
-		billToName := getBillToName(invoice)
-		src, dest := file, strings.Join([]string{billToName, file}, "-")
-		fmt.Println("Renaming: ", src, "to", dest)
+		billToName := getShipToName(invoice)
+		src, dest := file, strings.Join([]string{billToName, file}, "_")
+		fmt.Printf("Renaming %d of %d: %s to %s\n", (i + 1), total, src, dest)
 		os.Rename(src, dest)
 	}
 }
@@ -331,11 +332,23 @@ func readPdf(path string) (string, error) {
 	return buf.String(), nil
 }
 
-func getBillToName(pdfStr string) string {
+func getShipToName(pdfStr string) string {
 	var re = regexp.MustCompile(`('|,)`)
-	pdfStr = pdfStr[strings.Index(pdfStr, "BILL TO:")+8:]
-	for i, character := range pdfStr {
-		if unicode.IsDigit(character) {
+	var inParens = false
+	pdfStr = pdfStr[strings.Index(pdfStr, "SHIP TO:")+8:]
+
+	for i, curChar := range pdfStr {
+		if string(curChar) == "(" {
+			inParens = true
+		}
+		if inParens {
+			if string(curChar) == ")" {
+				inParens = false
+			} else {
+				continue
+			}
+		}
+		if unicode.IsDigit(curChar) {
 			pdfStr = strings.Replace(pdfStr[:i], " ", "_", -1)
 			break
 		}
