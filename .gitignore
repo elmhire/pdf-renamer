@@ -1,6 +1,7 @@
 /.vscode
 /ForwardedMessage.eml
 /LED-CLI
+/LED-CLI.exe
 /index.html
 /main
 /output.txt
@@ -8,3 +9,5 @@
 /workspace.code-workspace
 /go.sum
 /test/
+/SI-*
+/FW*

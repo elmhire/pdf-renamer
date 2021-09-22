@@ -6,6 +6,7 @@ require (
 	github.com/DusanKasan/parsemail v1.2.0
 	github.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88 // indirect
 	github.com/k0kubun/pp v3.0.1+incompatible // indirect
+	github.com/ledongthuc/pdf v0.0.0-20210621053716-e28cb8259002
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/stretchr/testify v1.7.0 // indirect

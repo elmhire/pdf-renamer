@@ -7,15 +7,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/DusanKasan/parsemail"
+	"github.com/ledongthuc/pdf"
 	"github.com/timakin/gonvert"
 	"golang.org/x/net/html"
 )
@@ -49,6 +53,8 @@ func main() {
 	complete := downloadLinks(links)
 	fmt.Printf("%d of %d files downloaded completely.\n\n", complete, len(links))
 
+	fmt.Println("Renaming files...")
+	renameFiles()
 	normalExit()
 } // End main
 
@@ -205,8 +211,8 @@ func extractLinks(htmlText string) ([]Link, error) {
 					}
 					links = append(links, link)
 					break
-				}
-			}
+				} // End if
+			} // End For
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			f(c)
@@ -273,7 +279,69 @@ func downloadFile(link Link, useLinkName bool, pathOptional ...string) error {
 
 	// Write the body to file
 	_, err = io.Copy(out, response.Body)
+	out.Close()
+
 	return err
+}
+
+func renameFiles() {
+	pdf.DebugOn = true
+
+	files := getPdfFiles()
+	for _, file := range files {
+		invoice, err := readPdf(file) // Read local pdf file
+		if err != nil {
+			panic(err)
+		}
+		billToName := getBillToName(invoice)
+		src, dest := file, strings.Join([]string{billToName, file}, "-")
+		fmt.Println("Renaming: ", src, "to", dest)
+		os.Rename(src, dest)
+	}
+}
+
+func getPdfFiles() []string {
+	var pdfList []string
+	files, err := ioutil.ReadDir(".")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, file := range files {
+		name := file.Name()
+		if strings.HasPrefix(name, "SI-") && strings.Contains(name, ".pdf") {
+			pdfList = append(pdfList, name)
+		}
+	}
+	return pdfList
+}
+
+func readPdf(path string) (string, error) {
+	f, r, err := pdf.Open(path)
+	// remember close file
+	defer f.Close()
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	b, err := r.GetPlainText()
+	if err != nil {
+		return "", err
+	}
+	buf.ReadFrom(b)
+	return buf.String(), nil
+}
+
+func getBillToName(pdfStr string) string {
+	var re = regexp.MustCompile(`('|,)`)
+	pdfStr = pdfStr[strings.Index(pdfStr, "BILL TO:")+8:]
+	for i, character := range pdfStr {
+		if unicode.IsDigit(character) {
+			pdfStr = strings.Replace(pdfStr[:i], " ", "_", -1)
+			break
+		}
+	}
+	pdfStr = re.ReplaceAllString(pdfStr, ``)
+	return pdfStr
 }
 
 func normalExit() {
