@@ -363,7 +363,6 @@ func normalExit() {
 	os.Exit(0)
 }
 
-// Test comment
 func pause() {
 	_, err := bufio.NewReader(os.Stdin).ReadBytes('\n')
 	if err != nil {
